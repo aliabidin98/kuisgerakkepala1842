@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuis Gerak Kepala</title>
+    <title>Kuis - Gerak Kepala</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -188,34 +188,50 @@
         </div>
 
         <!-- Layar Pengaturan -->
-        <div id="settings-screen" class="glass-panel p-8 md:p-10 rounded-[2rem] flex flex-col w-full max-w-lg hidden animate-pop relative">
+        <div id="settings-screen" class="glass-panel p-8 md:p-10 rounded-[2rem] flex flex-col w-full max-w-lg hidden animate-pop relative max-h-[90vh] overflow-y-auto">
             <button onclick="showScreen('menu-screen')" class="absolute top-6 right-6 text-gray-400 hover:text-white text-2xl transition-colors"><i class="fa-solid fa-xmark"></i></button>
-            <h2 class="text-3xl md:text-4xl mb-8 font-heading text-center text-orange-400"><i class="fa-solid fa-gear"></i> Pengaturan</h2>
+            <h2 class="text-3xl md:text-4xl mb-6 font-heading text-center text-orange-400"><i class="fa-solid fa-gear"></i> Pengaturan</h2>
             
-            <div class="space-y-6">
+            <div class="space-y-5">
+                <!-- Pengaturan Ukuran Teks Soal & Jawaban -->
+                <div class="w-full bg-gray-900/80 p-5 rounded-2xl border border-gray-700/50 shadow-inner">
+                    <label class="block text-sm text-gray-300 mb-1 font-bold text-center uppercase tracking-wider"><i class="fa-solid fa-text-height text-cyan-400 mr-1"></i> Ukuran Huruf Soal & Jawaban</label>
+                    <p class="text-xs text-gray-400 text-center mb-3">Atur besar kecilnya ukuran teks pertanyaan dan pilihan jawaban</p>
+                    <div class="flex items-center justify-center bg-gray-800 rounded-xl overflow-hidden border border-gray-600 focus-within:border-cyan-400 transition-colors">
+                        <button onclick="adjustFontSize(-2)" class="px-5 py-3 bg-gray-700 hover:bg-gray-600 font-bold text-xl transition-colors w-16">-</button>
+                        <input type="text" id="font-size-input" value="36px" class="w-28 p-3 bg-transparent text-cyan-300 text-center text-xl font-bold outline-none" readonly>
+                        <button onclick="adjustFontSize(2)" class="px-5 py-3 bg-gray-700 hover:bg-gray-600 font-bold text-xl transition-colors w-16">+</button>
+                    </div>
+                    <!-- Pratinjau Teks -->
+                    <div class="mt-3 p-3 bg-gray-800/60 rounded-xl border border-gray-700 text-center overflow-hidden min-h-[80px] flex flex-col items-center justify-center gap-1">
+                        <p id="font-preview-text" class="font-bold text-white transition-all duration-200">Pratinjau Teks Soal</p>
+                        <p id="font-preview-opt" class="font-bold text-cyan-300 transition-all duration-200">Pratinjau Opsi Jawaban</p>
+                    </div>
+                </div>
+
                 <!-- Pengaturan Skor Target -->
                 <div class="w-full bg-gray-900/80 p-5 rounded-2xl border border-gray-700/50 shadow-inner">
-                    <label class="block text-sm text-gray-300 mb-3 font-bold text-center uppercase tracking-wider"><i class="fa-solid fa-flag-checkered text-yellow-400"></i> Skor Target Kemenangan</label>
+                    <label class="block text-sm text-gray-300 mb-3 font-bold text-center uppercase tracking-wider"><i class="fa-solid fa-flag-checkered text-yellow-400 mr-1"></i> Skor Target Kemenangan</label>
                     <div class="flex items-center justify-center bg-gray-800 rounded-xl overflow-hidden border border-gray-600 focus-within:border-blue-400 transition-colors">
                         <button onclick="adjustScore(-10)" class="px-5 py-3 bg-gray-700 hover:bg-gray-600 font-bold text-xl transition-colors w-16">-</button>
-                        <input type="number" id="target-score-input" value="50" min="10" step="10" class="w-24 p-3 bg-transparent text-white text-center text-2xl font-bold outline-none" readonly>
+                        <input type="number" id="target-score-input" value="50" min="10" step="10" class="w-28 p-3 bg-transparent text-white text-center text-2xl font-bold outline-none" readonly>
                         <button onclick="adjustScore(10)" class="px-5 py-3 bg-gray-700 hover:bg-gray-600 font-bold text-xl transition-colors w-16">+</button>
                     </div>
                 </div>
 
                 <!-- Pengaturan Waktu Kemiringan -->
                 <div class="w-full bg-gray-900/80 p-5 rounded-2xl border border-gray-700/50 shadow-inner">
-                    <label class="block text-sm text-gray-300 mb-2 font-bold text-center uppercase tracking-wider"><i class="fa-solid fa-stopwatch text-emerald-400"></i> Waktu Tahan Kemiringan</label>
-                    <p class="text-xs text-gray-400 text-center mb-4">Makin kecil angkanya = makin cepat menjawab</p>
+                    <label class="block text-sm text-gray-300 mb-1 font-bold text-center uppercase tracking-wider"><i class="fa-solid fa-stopwatch text-emerald-400 mr-1"></i> Waktu Tahan Kemiringan</label>
+                    <p class="text-xs text-gray-400 text-center mb-3">Makin kecil angkanya = makin cepat menjawab</p>
                     <div class="flex items-center justify-center bg-gray-800 rounded-xl overflow-hidden border border-gray-600 focus-within:border-emerald-400 transition-colors">
                         <button onclick="adjustTiltTime(-2)" class="px-5 py-3 bg-gray-700 hover:bg-gray-600 font-bold text-xl transition-colors w-16">-</button>
-                        <input type="number" id="tilt-time-input" value="10" min="3" max="100" step="1" class="w-24 p-3 bg-transparent text-white text-center text-2xl font-bold outline-none" readonly>
+                        <input type="number" id="tilt-time-input" value="14" min="3" max="100" step="1" class="w-28 p-3 bg-transparent text-white text-center text-2xl font-bold outline-none" readonly>
                         <button onclick="adjustTiltTime(2)" class="px-5 py-3 bg-gray-700 hover:bg-gray-600 font-bold text-xl transition-colors w-16">+</button>
                     </div>
                 </div>
             </div>
 
-            <button onclick="saveSettingsAndGoBack()" class="mt-8 py-4 px-6 bg-orange-600 hover:bg-orange-500 rounded-xl font-bold transition-all w-full shadow-lg flex items-center justify-center gap-2 text-lg"><i class="fa-solid fa-floppy-disk"></i> Simpan & Kembali</button>
+            <button onclick="saveSettingsAndGoBack()" class="mt-6 py-4 px-6 bg-orange-600 hover:bg-orange-500 rounded-xl font-bold transition-all w-full shadow-lg flex items-center justify-center gap-2 text-lg"><i class="fa-solid fa-floppy-disk"></i> Simpan & Kembali</button>
         </div>
 
         <!-- Layar Editor Soal -->
@@ -317,7 +333,7 @@
                         
                         <div class="glass-box p-8 rounded-3xl mb-10 min-h-[160px] flex items-center justify-center relative overflow-hidden">
                             <div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent"></div>
-                            <h2 id="p1-question" class="text-3xl md:text-5xl font-bold drop-shadow-lg leading-tight relative z-10 text-white">Memuat Soal...</h2>
+                            <h2 id="p1-question" class="font-bold drop-shadow-lg leading-tight relative z-10 text-white">Memuat Soal...</h2>
                         </div>
                         
                         <div class="flex justify-between w-full gap-6">
@@ -350,7 +366,7 @@
                         
                         <div class="glass-box p-8 rounded-3xl mb-10 min-h-[160px] flex items-center justify-center relative overflow-hidden">
                             <div class="absolute inset-0 bg-gradient-to-bl from-emerald-500/10 to-transparent"></div>
-                            <h2 id="p2-question" class="text-3xl md:text-5xl font-bold drop-shadow-lg leading-tight relative z-10 text-white">Memuat Soal...</h2>
+                            <h2 id="p2-question" class="font-bold drop-shadow-lg leading-tight relative z-10 text-white">Memuat Soal...</h2>
                         </div>
 
                         <div class="flex justify-between w-full gap-6">
@@ -416,6 +432,7 @@
         let gameMode = 0; // 0: menu, 1: 1P, 2: 2P
         let gameActive = false;
         let targetScore = 50;
+        let questionFontSize = 36; // Default Ukuran Font Soal dalam pixel
         
         // State Pemain
         const p1 = { score: 0, currentQ: null, tiltProgress: 0, tiltDirection: null, isAnswering: false };
@@ -449,6 +466,12 @@
                 TILT_TIME_REQUIRED = parseInt(storedTiltTime);
                 document.getElementById('tilt-time-input').value = TILT_TIME_REQUIRED;
             }
+
+            const storedFontSize = localStorage.getItem('edutilt_font_size');
+            if(storedFontSize) {
+                questionFontSize = parseInt(storedFontSize);
+            }
+            updateFontSizeUI();
 
             renderTable();
         }
@@ -492,12 +515,29 @@
             input.value = val;
         }
 
+        function adjustFontSize(amount) {
+            questionFontSize += amount;
+            if (questionFontSize < 20) questionFontSize = 20;
+            if (questionFontSize > 60) questionFontSize = 60;
+            updateFontSizeUI();
+        }
+
+        function updateFontSizeUI() {
+            const input = document.getElementById('font-size-input');
+            const preview = document.getElementById('font-preview-text');
+            const previewOpt = document.getElementById('font-preview-opt');
+            if (input) input.value = `${questionFontSize}px`;
+            if (preview) preview.style.fontSize = `${questionFontSize}px`;
+            if (previewOpt) previewOpt.style.fontSize = `${Math.max(16, Math.round(questionFontSize * 0.75))}px`;
+        }
+
         function saveSettingsAndGoBack() {
             targetScore = parseInt(document.getElementById('target-score-input').value) || 50;
             TILT_TIME_REQUIRED = parseInt(document.getElementById('tilt-time-input').value) || 10;
             
             localStorage.setItem('edutilt_target_score', targetScore);
             localStorage.setItem('edutilt_tilt_time', TILT_TIME_REQUIRED);
+            localStorage.setItem('edutilt_font_size', questionFontSize);
             
             showScreen('menu-screen');
         }
@@ -705,10 +745,20 @@
             playerRef.tiltDirection = null;
             playerRef.isAnswering = false;
 
+            const optFontSize = Math.max(16, Math.round(questionFontSize * 0.75));
+
             const prefix = pIndex === 1 ? 'p1' : 'p2';
-            document.getElementById(`${prefix}-question`).innerText = randomQ.q;
-            document.getElementById(`${prefix}-text-left`).innerText = randomQ.l;
-            document.getElementById(`${prefix}-text-right`).innerText = randomQ.r;
+            const qElement = document.getElementById(`${prefix}-question`);
+            qElement.innerText = randomQ.q;
+            qElement.style.fontSize = `${questionFontSize}px`;
+
+            const optLeft = document.getElementById(`${prefix}-text-left`);
+            optLeft.innerText = randomQ.l;
+            optLeft.style.fontSize = `${optFontSize}px`;
+
+            const optRight = document.getElementById(`${prefix}-text-right`);
+            optRight.innerText = randomQ.r;
+            optRight.style.fontSize = `${optFontSize}px`;
             
             document.getElementById(`${prefix}-prog-left`).style.width = '0%';
             document.getElementById(`${prefix}-prog-right`).style.width = '0%';
