@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kuis Gerak Kepala</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: white;
+            overflow: hidden; /* Mencegah scroll */
+            touch-action: none;
+        }
+        h1, h2, h3, .font-heading {
+            font-family: 'Fredoka One', cursive;
+            letter-spacing: 1px;
+        }
+        .video-container {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1;
+            opacity: 0.85;
+        }
+        video {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Efek Cermin */
+        }
+        canvas {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 2;
+            transform: scaleX(-1);
+            pointer-events: none;
+        }
+        .ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10;
+        }
+        
+        /* UI Kaca (Transparan Bening / Crystal Clear) */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.25);
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+        .glass-box {
+            background: rgba(15, 23, 42, 0.20);
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Komponen Progress dan Kartu */
+        .progress-bar-container {
+            width: 100%; height: 24px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 15px;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+        .progress-bar {
+            height: 100%; width: 0%;
+            background: linear-gradient(90deg, #34d399, #10b981);
+            transition: width 0.1s linear;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+        
+        .option-card {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        .option-card.active-tilt {
+            transform: scale(1.08) translateY(-5px);
+            border-color: #34d399;
+            box-shadow: 0 10px 25px rgba(52, 211, 153, 0.4);
+            background: rgba(16, 185, 129, 0.25);
+        }
+        
+        /* Animasi Transisi & Miring (3D Effect) */
+        @keyframes pop {
+            0% { transform: scale(0.8) translateY(20px); opacity: 0; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .animate-pop { animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        .tilt-left-anim { 
+            transform: perspective(1200px) rotateY(-15deg) rotateZ(-3deg) scale(1.02); 
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            box-shadow: -15px 15px 30px rgba(0,0,0,0.4);
+        }
+        .tilt-right-anim { 
+            transform: perspective(1200px) rotateY(15deg) rotateZ(3deg) scale(1.02); 
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            box-shadow: 15px 15px 30px rgba(0,0,0,0.4);
+        }
+        .tilt-neutral { 
+            transform: perspective(1200px) rotateY(0deg) rotateZ(0deg) scale(1); 
+            transition: all 0.4s ease-out; 
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.5); }
+    </style>
+</head>
+<body>
+
+    <!-- Kamera Background -->
+    <div class="video-container" id="camera-wrapper" style="display: none;">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="output_canvas"></canvas>
+    </div>
+
+    <!-- UI Layer Utama -->
+    <div class="ui-layer flex flex-col items-center justify-center h-screen w-full p-4" id="main-ui">
+        
+        <!-- Menu Utama -->
+        <div id="menu-screen" class="glass-panel p-8 md:p-12 rounded-[2rem] flex flex-col items-center w-full max-w-lg animate-pop">
+            <div class="text-6xl mb-4 text-orange-400 drop-shadow-[0_0_15px_rgba(96,165,250,0.6)]"><i class="fa-solid fa-gamepad"></i></div>
+            <h1 class="text-5xl md:text-6xl text-center mb-2 font-heading text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-emerald-400 filter drop-shadow-md">Kuis Gerak Kepala</h1>
+            <p class="text-white-300 mb-8 text-center text-lg">Jawab soal dengan memiringkan kepalamu!</p>
+            
+            <button onclick="startGame(1)" class="w-full py-4 mb-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 rounded-xl font-bold text-xl transition-all shadow-[0_0_20px_rgba(14,165,233,0.4)] hover:scale-[1.02] flex items-center justify-center gap-3">
+                <i class="fa-solid fa-user"></i> 1 Pemain
+            </button>
+            <button onclick="startGame(2)" class="w-full py-4 mb-6 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-xl font-bold text-xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)] hover:scale-[1.02] flex items-center justify-center gap-3">
+                <i class="fa-solid fa-user-group"></i> 2 Pemain (Split Screen)
+            </button>
+            <div class="grid grid-cols-3 w-full gap-2 md:gap-4 mt-2">
+                <button onclick="showScreen('editor-screen')" class="py-3 bg-gray-700/80 hover:bg-gray-600 rounded-xl font-bold transition-all border border-gray-500 hover:border-gray-400 flex flex-col justify-center items-center gap-1 text-sm">
+                    <i class="fa-solid fa-pen-to-square text-lg"></i> Soal
+                </button>
+                <button onclick="showScreen('settings-screen')" class="py-3 bg-orange-600/80 hover:bg-orange-500 rounded-xl font-bold transition-all border border-orange-500 hover:border-orange-400 flex flex-col justify-center items-center gap-1 text-sm">
+                    <i class="fa-solid fa-gear text-lg"></i> Pengaturan
+                </button>
+                <button onclick="showScreen('help-screen')" class="py-3 bg-indigo-600/80 hover:bg-indigo-500 rounded-xl font-bold transition-all border border-indigo-500 hover:border-indigo-400 flex flex-col justify-center items-center gap-1 text-sm">
+                    <i class="fa-solid fa-circle-question text-lg"></i> Bantuan
+                </button>
+            </div>
+            
+            <!-- Footer Nama Pembuat -->
+            <div class="mt-8 pt-5 border-t border-gray-600/40 w-full text-center">
+                <p class="text-sm text-white-400 font-bold tracking-wide">Dibuat oleh : M. Nur Ali Abidin,S.Pd.</p>
+            </div>
+        </div>
+
+        <!-- Layar Cara Bermain -->
+        <div id="help-screen" class="glass-panel p-8 md:p-10 rounded-[2rem] flex flex-col w-full max-w-2xl hidden animate-pop relative">
+            <button onclick="showScreen('menu-screen')" class="absolute top-6 right-6 text-gray-400 hover:text-white text-2xl transition-colors"><i class="fa-solid fa-xmark"></i></button>
+            <h2 class="text-3xl md:text-4xl mb-8 font-heading text-center text-indigo-400"><i class="fa-solid fa-book-open"></i> Cara Bermain</h2>
+            
+            <div class="space-y-6 text-lg text-gray-200">
+                <div class="flex gap-4 items-start">
+                    <div class="bg-indigo-500/20 p-3 rounded-xl text-indigo-400"><i class="fa-solid fa-camera text-2xl"></i></div>
+                    <p class="pt-2">Pastikan browser <b>diizinkan mengakses Kamera</b>. Game ini membaca gerakan wajahmu!</p>
+                </div>
+                <div class="flex gap-4 items-start">
+                    <div class="bg-blue-500/20 p-3 rounded-xl text-blue-400"><i class="fa-solid fa-left-right text-2xl"></i></div>
+                    <p class="pt-2">Miringkan kepalamu ke <b>KIRI</b> atau <b>KANAN</b> secara perlahan untuk memilih jawaban yang sesuai di layar.</p>
+                </div>
+                <div class="flex gap-4 items-start">
+                    <div class="bg-emerald-500/20 p-3 rounded-xl text-emerald-400"><i class="fa-regular fa-hourglass-half text-2xl"></i></div>
+                    <p class="pt-2"><b>Tahan posisimu</b> selama ±1 detik hingga bar hijau terisi penuh untuk mengunci jawaban.</p>
+                </div>
+                <div class="flex gap-4 items-start">
+                    <div class="bg-yellow-500/20 p-3 rounded-xl text-yellow-400"><i class="fa-solid fa-trophy text-2xl"></i></div>
+                    <p class="pt-2">Raih <b>Skor Target</b> secepatnya. Untuk mode 2 pemain, layar akan dibagi dua secara otomatis!</p>
+                </div>
+            </div>
+            <button onclick="showScreen('menu-screen')" class="mt-10 py-4 px-6 bg-gray-700 hover:bg-gray-600 rounded-xl font-bold transition-all w-full md:w-auto mx-auto shadow-lg">Mengerti, Kembali ke Menu</button>
+        </div>
+
+        <!-- Layar Pengaturan -->
+        <div id="settings-screen" class="glass-panel p-8 md:p-10 rounded-[2rem] flex flex-col w-full max-w-lg hidden animate-pop relative">
+            <button onclick="showScreen('menu-screen')" class="absolute top-6 right-6 text-gray-400 hover:text-white text-2xl transition-colors"><i class="fa-solid fa-xmark"></i></button>
+            <h2 class="text-3xl md:text-4xl mb-8 font-heading text-center text-orange-400"><i class="fa-solid fa-gear"></i> Pengaturan</h2>
+            
+            <div class="space-y-6">
+                <!-- Pengaturan Skor Target -->
+                <div class="w-full bg-gray-900/80 p-5 rounded-2xl border border-gray-700/50 shadow-inner">
+                    <label class="block text-sm text-gray-300 mb-3 font-bold text-center uppercase tracking-wider"><i class="fa-solid fa-flag-checkered text-yellow-400"></i> Skor Target Kemenangan</label>
+                    <div class="flex items-center justify-center bg-gray-800 rounded-xl overflow-hidden border border-gray-600 focus-within:border-blue-400 transition-colors">
+                        <button onclick="adjustScore(-10)" class="px-5 py-3 bg-gray-700 hover:bg-gray-600 font-bold text-xl transition-colors w-16">-</button>
+                        <input type="number" id="target-score-input" value="50" min="10" step="10" class="w-24 p-3 bg-transparent text-white text-center text-2xl font-bold outline-none" readonly>
+                        <button onclick="adjustScore(10)" class="px-5 py-3 bg-gray-700 hover:bg-gray-600 font-bold text-xl transition-colors w-16">+</button>
+                    </div>
+                </div>
+
+                <!-- Pengaturan Waktu Kemiringan -->
+                <div class="w-full bg-gray-900/80 p-5 rounded-2xl border border-gray-700/50 shadow-inner">
+                    <label class="block text-sm text-gray-300 mb-2 font-bold text-center uppercase tracking-wider"><i class="fa-solid fa-stopwatch text-emerald-400"></i> Waktu Tahan Kemiringan</label>
+                    <p class="text-xs text-gray-400 text-center mb-4">Makin kecil angkanya = makin cepat menjawab</p>
+                    <div class="flex items-center justify-center bg-gray-800 rounded-xl overflow-hidden border border-gray-600 focus-within:border-emerald-400 transition-colors">
+                        <button onclick="adjustTiltTime(-2)" class="px-5 py-3 bg-gray-700 hover:bg-gray-600 font-bold text-xl transition-colors w-16">-</button>
+                        <input type="number" id="tilt-time-input" value="10" min="3" max="100" step="1" class="w-24 p-3 bg-transparent text-white text-center text-2xl font-bold outline-none" readonly>
+                        <button onclick="adjustTiltTime(2)" class="px-5 py-3 bg-gray-700 hover:bg-gray-600 font-bold text-xl transition-colors w-16">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="saveSettingsAndGoBack()" class="mt-8 py-4 px-6 bg-orange-600 hover:bg-orange-500 rounded-xl font-bold transition-all w-full shadow-lg flex items-center justify-center gap-2 text-lg"><i class="fa-solid fa-floppy-disk"></i> Simpan & Kembali</button>
+        </div>
+
+        <!-- Layar Editor Soal -->
+        <div id="editor-screen" class="glass-panel p-6 md:p-8 rounded-[2rem] flex flex-col w-full max-w-5xl h-[90vh] hidden animate-pop overflow-hidden relative">
+            <button onclick="showScreen('menu-screen')" class="absolute top-6 right-6 text-gray-400 hover:text-white text-2xl transition-colors z-10"><i class="fa-solid fa-xmark"></i></button>
+            <h2 class="text-3xl mb-2 font-heading text-center text-yellow-400"><i class="fa-solid fa-database"></i> Bank Soal</h2>
+            <p class="text-center text-gray-400 mb-6">Tambah, hapus, atau impor soal dari Excel / CSV.</p>
+            
+            <div class="flex flex-wrap gap-4 mb-6 bg-gray-900/80 p-5 rounded-2xl items-end border border-gray-700/50 shadow-inner">
+                <div class="flex-1 min-w-[250px]">
+                    <label class="block text-sm mb-2 text-gray-300 font-bold">Pertanyaan Baru</label>
+                    <input type="text" id="form-q" class="w-full p-3 bg-gray-800 rounded-xl text-white border border-gray-600 focus:border-yellow-400 outline-none transition-colors" placeholder="Ketik soal di sini...">
+                </div>
+                <div class="w-full md:w-32">
+                    <label class="block text-sm mb-2 text-gray-300 font-bold">Opsi Kiri</label>
+                    <input type="text" id="form-l" class="w-full p-3 bg-gray-800 rounded-xl text-white border border-gray-600 focus:border-yellow-400 outline-none transition-colors" placeholder="Teks kiri">
+                </div>
+                <div class="w-full md:w-32">
+                    <label class="block text-sm mb-2 text-gray-300 font-bold">Opsi Kanan</label>
+                    <input type="text" id="form-r" class="w-full p-3 bg-gray-800 rounded-xl text-white border border-gray-600 focus:border-yellow-400 outline-none transition-colors" placeholder="Teks kanan">
+                </div>
+                <div class="w-full md:w-40">
+                    <label class="block text-sm mb-2 text-gray-300 font-bold">Kunci Jawaban</label>
+                    <select id="form-a" class="w-full p-3 bg-gray-800 rounded-xl text-white border border-gray-600 focus:border-yellow-400 outline-none transition-colors cursor-pointer">
+                        <option value="kiri">Kiri (Kiri Layar)</option>
+                        <option value="kanan">Kanan (Kanan Layar)</option>
+                    </select>
+                </div>
+                <button onclick="addQuestion()" class="w-full md:w-auto py-3 px-6 bg-yellow-600 hover:bg-yellow-500 rounded-xl font-bold transition-all shadow-[0_0_15px_rgba(202,138,4,0.4)] h-[50px] mt-2 md:mt-0"><i class="fa-solid fa-plus"></i> Tambah</button>
+            </div>
+
+            <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                <div class="text-sm text-gray-300 bg-blue-900/50 p-3 rounded-lg border border-blue-500/40 flex-1">
+                    <i class="fa-solid fa-circle-info text-blue-400 mr-2"></i><b>Info Excel (.xlsx / .csv):</b> Gunakan kolom header: <code class="bg-black/50 text-yellow-300 px-2 py-0.5 rounded mx-1">Soal</code> <code class="bg-black/50 text-yellow-300 px-2 py-0.5 rounded mx-1">OpsiKiri</code> <code class="bg-black/50 text-yellow-300 px-2 py-0.5 rounded mx-1">OpsiKanan</code> <code class="bg-black/50 text-yellow-300 px-2 py-0.5 rounded mx-1">Jawaban</code> (isi dengan "kiri" atau "kanan").
+                </div>
+                <div class="flex gap-3 flex-wrap justify-center w-full md:w-auto">
+                    <button onclick="downloadTemplate()" class="py-2.5 px-5 bg-sky-600 hover:bg-sky-500 rounded-lg font-bold transition-all text-sm shadow-lg flex items-center gap-2"><i class="fa-solid fa-file-excel"></i> Unduh Template Excel</button>
+                    <input type="file" id="excel-file" accept=".xlsx, .xls, .csv" class="hidden" onchange="importExcel(event)">
+                    <button onclick="document.getElementById('excel-file').click()" class="py-2.5 px-5 bg-emerald-600 hover:bg-emerald-500 rounded-lg font-bold transition-all text-sm shadow-lg flex items-center gap-2"><i class="fa-solid fa-file-import"></i> Impor Excel / CSV</button>
+                    <button onclick="resetQuestions()" class="py-2.5 px-5 bg-red-600/80 hover:bg-red-500 rounded-lg font-bold transition-all text-sm shadow-lg border border-red-500 flex items-center gap-2"><i class="fa-solid fa-rotate-left"></i> Reset Bawaan</button>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto bg-gray-900/80 rounded-xl border border-gray-700/50 custom-scrollbar">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-gray-800/90 sticky top-0 z-10">
+                        <tr>
+                            <th class="p-4 border-b border-gray-700 font-bold text-gray-300">Soal</th>
+                            <th class="p-4 border-b border-gray-700 font-bold text-gray-300 w-1/6">Opsi Kiri</th>
+                            <th class="p-4 border-b border-gray-700 font-bold text-gray-300 w-1/6">Opsi Kanan</th>
+                            <th class="p-4 border-b border-gray-700 font-bold text-gray-300 w-24">Kunci</th>
+                            <th class="p-4 border-b border-gray-700 font-bold text-gray-300 text-center w-20">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="question-table-body" class="divide-y divide-gray-700/50">
+                        <!-- Baris tabel di-generate via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Layar Permainan Aktif -->
+        <div id="game-screen" class="hidden w-full h-full relative">
+            
+            <!-- Layar Loading Kamera -->
+            <div id="loading-camera" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90 z-[60]">
+                <div class="relative w-24 h-24 mb-6">
+                    <div class="absolute inset-0 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+                    <div class="absolute inset-2 border-4 border-emerald-500/20 border-b-emerald-500 rounded-full animate-spin" style="animation-direction: reverse; animation-duration: 1.5s;"></div>
+                    <i class="fa-solid fa-camera absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-3xl text-gray-300"></i>
+                </div>
+                <h2 class="text-3xl font-heading animate-pulse text-white mb-2">Menyiapkan Kamera & AI...</h2>
+                <p class="text-gray-400 text-lg max-w-md text-center">Mohon izinkan akses kamera pada browser Anda. AI pendeteksi wajah sedang dimuat.</p>
+            </div>
+
+            <!-- Header Status Game -->
+            <div class="absolute top-6 left-0 w-full flex justify-between items-center px-6 md:px-12 z-30 pointer-events-none">
+                <button onclick="endGame()" class="py-2.5 px-5 bg-red-600/90 hover:bg-red-500 rounded-xl font-bold shadow-lg pointer-events-auto border border-red-400/30 transition-transform hover:scale-105 flex items-center gap-2">
+                    <i class="fa-solid fa-arrow-left"></i> Akhiri
+                </button>
+                <div id="score-display" class="font-heading text-2xl md:text-3xl text-yellow-400 bg-gray-900/85 px-8 py-3 rounded-2xl border border-yellow-400/40 shadow-[0_0_20px_rgba(0,0,0,0.5)]">
+                    Skor: 0
+                </div>
+            </div>
+
+            <!-- Indikator Status AI (Kanan Bawah) -->
+            <div id="ai-status" class="absolute bottom-6 right-6 z-30 flex items-center gap-2 bg-gray-900/90 px-4 py-2 rounded-full border border-gray-600 hidden shadow-lg">
+                <div class="w-3 h-3 rounded-full bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.8)]"></div>
+                <span class="text-sm font-bold text-gray-200 tracking-wide">AI Melacak Wajah</span>
+            </div>
+
+            <!-- Area Bermain (Container Utama) -->
+            <div id="play-area" class="w-full h-full flex pt-28 pb-12 px-6 md:px-12 gap-8 relative z-20">
+                
+                <!-- Area Pemain 1 -->
+                <div id="p1-area" class="flex-1 flex flex-col items-center justify-center relative hidden h-full">
+                    <div id="p1-content" class="w-full max-w-2xl text-center tilt-neutral glass-panel p-8 rounded-[2.5rem]">
+                        <div class="bg-blue-600/40 border border-blue-400 text-blue-200 px-5 py-1.5 rounded-full inline-block mb-6 font-bold tracking-widest uppercase shadow-[0_0_15px_rgba(96,165,250,0.3)]">Pemain 1</div>
+                        
+                        <div class="glass-box p-8 rounded-3xl mb-10 min-h-[160px] flex items-center justify-center relative overflow-hidden">
+                            <div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent"></div>
+                            <h2 id="p1-question" class="text-3xl md:text-5xl font-bold drop-shadow-lg leading-tight relative z-10 text-white">Memuat Soal...</h2>
+                        </div>
+                        
+                        <div class="flex justify-between w-full gap-6">
+                            <div id="p1-opt-left" class="option-card flex-1 glass-box border-[3px] border-gray-600/50 p-6 rounded-3xl text-center relative overflow-hidden">
+                                <h3 class="text-lg text-gray-300 font-bold mb-3 uppercase tracking-wide flex justify-center items-center gap-2"><i class="fa-solid fa-arrow-turn-down transform rotate-90 text-blue-400"></i> Miring Kiri</h3>
+                                <p id="p1-text-left" class="text-2xl md:text-3xl font-bold text-white drop-shadow-md">Opsi A</p>
+                                <div class="progress-bar-container"><div id="p1-prog-left" class="progress-bar"></div></div>
+                            </div>
+                            <div id="p1-opt-right" class="option-card flex-1 glass-box border-[3px] border-gray-600/50 p-6 rounded-3xl text-center relative overflow-hidden">
+                                <h3 class="text-lg text-gray-300 font-bold mb-3 uppercase tracking-wide flex justify-center items-center gap-2">Miring Kanan <i class="fa-solid fa-arrow-turn-down transform -rotate-90 scale-x-[-1] text-emerald-400"></i></h3>
+                                <p id="p1-text-right" class="text-2xl md:text-3xl font-bold text-white drop-shadow-md">Opsi B</p>
+                                <div class="progress-bar-container"><div id="p1-prog-right" class="progress-bar"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Feedback Overlay P1 (Benar/Salah) -->
+                    <div id="p1-feedback" class="absolute inset-0 flex items-center justify-center hidden bg-gray-900/90 rounded-[3rem] z-40 border border-gray-600/50 shadow-2xl">
+                        <h1 id="p1-feedback-text" class="text-7xl font-heading animate-pop text-center px-4"></h1>
+                    </div>
+                </div>
+
+                <!-- Garis Pembatas Split Screen (mode 2P) -->
+                <div id="divider" class="w-1.5 bg-gradient-to-b from-transparent via-gray-400/50 to-transparent rounded-full hidden opacity-80 shadow-[0_0_15px_rgba(255,255,255,0.3)] h-full"></div>
+
+                <!-- Area Pemain 2 -->
+                <div id="p2-area" class="flex-1 flex flex-col items-center justify-center relative hidden h-full">
+                    <div id="p2-content" class="w-full max-w-2xl text-center tilt-neutral glass-panel p-8 rounded-[2.5rem]">
+                        <div class="bg-emerald-600/40 border border-emerald-400 text-emerald-200 px-5 py-1.5 rounded-full inline-block mb-6 font-bold tracking-widest uppercase shadow-[0_0_15px_rgba(52,211,153,0.3)]">Pemain 2</div>
+                        
+                        <div class="glass-box p-8 rounded-3xl mb-10 min-h-[160px] flex items-center justify-center relative overflow-hidden">
+                            <div class="absolute inset-0 bg-gradient-to-bl from-emerald-500/10 to-transparent"></div>
+                            <h2 id="p2-question" class="text-3xl md:text-5xl font-bold drop-shadow-lg leading-tight relative z-10 text-white">Memuat Soal...</h2>
+                        </div>
+
+                        <div class="flex justify-between w-full gap-6">
+                            <div id="p2-opt-left" class="option-card flex-1 glass-box border-[3px] border-gray-600/50 p-6 rounded-3xl text-center relative overflow-hidden">
+                                <h3 class="text-lg text-gray-300 font-bold mb-3 uppercase tracking-wide flex justify-center items-center gap-2"><i class="fa-solid fa-arrow-turn-down transform rotate-90 text-blue-400"></i> Miring Kiri</h3>
+                                <p id="p2-text-left" class="text-2xl md:text-3xl font-bold text-white drop-shadow-md">Opsi A</p>
+                                <div class="progress-bar-container"><div id="p2-prog-left" class="progress-bar"></div></div>
+                            </div>
+                            <div id="p2-opt-right" class="option-card flex-1 glass-box border-[3px] border-gray-600/50 p-6 rounded-3xl text-center relative overflow-hidden">
+                                <h3 class="text-lg text-gray-300 font-bold mb-3 uppercase tracking-wide flex justify-center items-center gap-2">Miring Kanan <i class="fa-solid fa-arrow-turn-down transform -rotate-90 scale-x-[-1] text-emerald-400"></i></h3>
+                                <p id="p2-text-right" class="text-2xl md:text-3xl font-bold text-white drop-shadow-md">Opsi B</p>
+                                <div class="progress-bar-container"><div id="p2-prog-right" class="progress-bar"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Feedback Overlay P2 (Benar/Salah) -->
+                    <div id="p2-feedback" class="absolute inset-0 flex items-center justify-center hidden bg-gray-900/90 rounded-[3rem] z-40 border border-gray-600/50 shadow-2xl">
+                        <h1 id="p2-feedback-text" class="text-7xl font-heading animate-pop text-center px-4"></h1>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overlay Pemenang -->
+        <div id="winner-screen" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/95 z-[70] hidden">
+            
+            <div class="absolute inset-0 overflow-hidden pointer-events-none">
+                <div class="absolute top-1/4 left-1/4 w-32 h-32 bg-blue-500 rounded-full mix-blend-screen opacity-40 animate-pulse"></div>
+                <div class="absolute bottom-1/4 right-1/4 w-40 h-40 bg-emerald-500 rounded-full mix-blend-screen opacity-40 animate-pulse"></div>
+                <div class="absolute top-1/2 left-1/2 w-48 h-48 bg-yellow-500 rounded-full mix-blend-screen opacity-30"></div>
+            </div>
+
+            <div class="text-[8rem] mb-4 animate-bounce drop-shadow-[0_0_30px_rgba(253,224,71,0.8)] relative z-10" id="winner-icon">🏆</div>
+            <h1 id="winner-text" class="text-6xl md:text-8xl font-heading text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 to-yellow-600 mb-6 animate-pop text-center px-4 filter drop-shadow-lg relative z-10">Pemain 1 Menang!</h1>
+            <div class="bg-gray-800/90 border border-gray-600 px-8 py-4 rounded-2xl mb-10 relative z-10 shadow-xl">
+                <p id="winner-score" class="text-3xl text-gray-200 font-bold">Skor Akhir: 50</p>
+            </div>
+            
+            <button onclick="endGame()" class="py-4 px-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-2xl font-bold text-2xl transition-all shadow-[0_0_30px_rgba(79,70,229,0.6)] hover:scale-105 animate-pop relative z-10 flex items-center gap-3" style="animation-delay: 0.3s;">
+                <i class="fa-solid fa-house"></i> Main Lagi (Ke Menu)
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // Data Bawaan Soal
+        const defaultQuestions = [
+            { id: 1, q: "Apa nama ibukota negara Indonesia?", l: "Bandung", r: "Jakarta", a: "kanan" },
+            { id: 2, q: "Berapa hasil dari 7 x 8?", l: "56", r: "54", a: "kiri" },
+            { id: 3, q: "Hewan mamalia yang bisa terbang?", l: "Kelelawar", r: "Burung Hantu", a: "kiri" },
+            { id: 4, q: "Planet terdekat dari matahari?", l: "Mars", r: "Merkurius", a: "kanan" },
+            { id: 5, q: "Siapa penemu bola lampu pijar?", l: "Thomas A. Edison", r: "Nikola Tesla", a: "kiri" },
+            { id: 6, q: "Rumus kimia dari Air adalah?", l: "H2O", r: "CO2", a: "kiri" },
+            { id: 7, q: "Bahasa Inggris dari 'Buku'?", l: "Pencil", r: "Book", a: "kanan" },
+            { id: 8, q: "Bentuk geometri dengan 3 sisi?", l: "Segitiga", r: "Persegi", a: "kiri" },
+            { id: 9, q: "Warna bendera Indonesia?", l: "Merah Putih", r: "Putih Merah", a: "kiri" },
+            { id: 10, q: "Zat hijau daun disebut?", l: "Stomata", r: "Klorofil", a: "kanan" }
+        ];
+
+        let questions = [];
+        let gameMode = 0; // 0: menu, 1: 1P, 2: 2P
+        let gameActive = false;
+        let targetScore = 50;
+        
+        // State Pemain
+        const p1 = { score: 0, currentQ: null, tiltProgress: 0, tiltDirection: null, isAnswering: false };
+        const p2 = { score: 0, currentQ: null, tiltProgress: 0, tiltDirection: null, isAnswering: false };
+
+        const TILT_THRESHOLD = 10;
+        let TILT_TIME_REQUIRED = 10;
+        
+        function initData() {
+            const stored = localStorage.getItem('edutilt_questions');
+            if (stored) {
+                try {
+                    questions = JSON.parse(stored);
+                    if(questions.length === 0) throw new Error("Empty");
+                } catch (e) {
+                    questions = [...defaultQuestions];
+                }
+            } else {
+                questions = [...defaultQuestions];
+            }
+            saveQuestions();
+            
+            const storedTargetScore = localStorage.getItem('edutilt_target_score');
+            if(storedTargetScore) {
+                targetScore = parseInt(storedTargetScore);
+                document.getElementById('target-score-input').value = targetScore;
+            }
+            
+            const storedTiltTime = localStorage.getItem('edutilt_tilt_time');
+            if(storedTiltTime) {
+                TILT_TIME_REQUIRED = parseInt(storedTiltTime);
+                document.getElementById('tilt-time-input').value = TILT_TIME_REQUIRED;
+            }
+
+            renderTable();
+        }
+
+        function saveQuestions() {
+            localStorage.setItem('edutilt_questions', JSON.stringify(questions));
+        }
+
+        function showScreen(screenId) {
+            const screens = ['menu-screen', 'help-screen', 'editor-screen', 'game-screen', 'settings-screen'];
+            screens.forEach(id => document.getElementById(id).classList.add('hidden'));
+            
+            if(screenId !== 'game-screen') {
+                document.getElementById('camera-wrapper').style.display = 'none';
+            }
+
+            document.getElementById(screenId).classList.remove('hidden');
+            
+            if(screenId === 'menu-screen') {
+                gameMode = 0;
+                document.getElementById('winner-screen').classList.add('hidden');
+                document.getElementById('ai-status').classList.add('hidden');
+            }
+        }
+
+        function adjustScore(amount) {
+            const input = document.getElementById('target-score-input');
+            let val = parseInt(input.value) || 10;
+            val += amount;
+            if (val < 10) val = 10;
+            if (val > 1000) val = 1000;
+            input.value = val;
+        }
+
+        function adjustTiltTime(amount) {
+            const input = document.getElementById('tilt-time-input');
+            let val = parseInt(input.value) || 10;
+            val += amount;
+            if (val < 3) val = 3;
+            if (val > 100) val = 100;
+            input.value = val;
+        }
+
+        function saveSettingsAndGoBack() {
+            targetScore = parseInt(document.getElementById('target-score-input').value) || 50;
+            TILT_TIME_REQUIRED = parseInt(document.getElementById('tilt-time-input').value) || 10;
+            
+            localStorage.setItem('edutilt_target_score', targetScore);
+            localStorage.setItem('edutilt_tilt_time', TILT_TIME_REQUIRED);
+            
+            showScreen('menu-screen');
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('question-table-body');
+            tbody.innerHTML = '';
+            questions.forEach((q, index) => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-700/50 transition-colors";
+                tr.innerHTML = `
+                    <td class="p-4 border-b border-gray-700/50 text-gray-200">${q.q}</td>
+                    <td class="p-4 border-b border-gray-700/50 text-gray-300">${q.l}</td>
+                    <td class="p-4 border-b border-gray-700/50 text-gray-300">${q.r}</td>
+                    <td class="p-4 border-b border-gray-700/50 capitalize font-bold ${q.a === 'kiri' ? 'text-blue-400' : 'text-emerald-400'}">${q.a}</td>
+                    <td class="p-4 border-b border-gray-700/50 text-center">
+                        <button onclick="deleteQuestion(${index})" class="text-red-400 hover:text-red-300 bg-red-900/30 hover:bg-red-900/50 p-2.5 rounded-lg transition-colors"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function addQuestion() {
+            const q = document.getElementById('form-q').value.trim();
+            const l = document.getElementById('form-l').value.trim();
+            const r = document.getElementById('form-r').value.trim();
+            const a = document.getElementById('form-a').value;
+
+            if(!q || !l || !r) {
+                showMessage("Mohon lengkapi semua kolom: Pertanyaan dan Opsi!");
+                return;
+            }
+
+            questions.push({ id: Date.now(), q, l, r, a });
+            saveQuestions();
+            renderTable();
+            
+            document.getElementById('form-q').value = '';
+            document.getElementById('form-l').value = '';
+            document.getElementById('form-r').value = '';
+            document.getElementById('form-q').focus();
+        }
+
+        function deleteQuestion(index) {
+            questions.splice(index, 1);
+            saveQuestions();
+            renderTable();
+        }
+
+        function resetQuestions() {
+            questions = [...defaultQuestions];
+            saveQuestions();
+            renderTable();
+            showMessage("Bank Soal berhasil dikembalikan ke bawaan.");
+        }
+
+        function downloadTemplate() {
+            const templateData = [
+                { Soal: "Apa nama ibukota negara Indonesia?", OpsiKiri: "Bandung", OpsiKanan: "Jakarta", Jawaban: "kanan" },
+                { Soal: "Berapa hasil dari 7 x 8?", OpsiKiri: "56", OpsiKanan: "54", Jawaban: "kiri" },
+                { Soal: "Hewan mamalia yang bisa terbang?", OpsiKiri: "Kelelawar", OpsiKanan: "Burung Hantu", Jawaban: "kiri" },
+                { Soal: "Planet terdekat dari matahari?", OpsiKiri: "Mars", OpsiKanan: "Merkurius", Jawaban: "kanan" }
+            ];
+
+            try {
+                const worksheet = XLSX.utils.json_to_sheet(templateData);
+                worksheet['!cols'] = [
+                    { wch: 40 },
+                    { wch: 18 },
+                    { wch: 18 },
+                    { wch: 12 }
+                ];
+
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "Template Soal");
+
+                const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+                const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const url = URL.createObjectURL(blob);
+
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = "Template_Soal_EduTilt.xlsx";
+                document.body.appendChild(link);
+                link.click();
+                
+                setTimeout(() => {
+                    if (document.body.contains(link)) {
+                        document.body.removeChild(link);
+                    }
+                    URL.revokeObjectURL(url);
+                }, 300);
+            } catch (error) {
+                console.error("Gagal mengunduh file Excel:", error);
+            }
+
+            // Tampilkan modal bantuan jika unduhan diblokir oleh iframe browser
+            setTimeout(() => {
+                showDownloadFallbackModal(templateData);
+            }, 400);
+        }
+
+        function showDownloadFallbackModal(templateData) {
+            const csvText = "Soal,OpsiKiri,OpsiKanan,Jawaban\nApa nama ibukota negara Indonesia?,Bandung,Jakarta,kanan\nBerapa hasil dari 7 x 8?,56,54,kiri\nHewan mamalia yang bisa terbang?,Kelelawar,Burung Hantu,kiri\nPlanet terdekat dari matahari?,Mars,Merkurius,kanan";
+            const dataUri = "data:text/csv;charset=utf-8," + encodeURIComponent(csvText);
+
+            const existing = document.getElementById('download-fallback-modal');
+            if (existing) existing.remove();
+
+            const modal = document.createElement('div');
+            modal.id = 'download-fallback-modal';
+            modal.className = "fixed inset-0 flex items-center justify-center bg-black/80 z-[120] p-4 animate-pop";
+            modal.innerHTML = `
+                <div class="glass-panel p-6 md:p-8 rounded-2xl max-w-md w-full text-center relative border border-gray-600 shadow-2xl">
+                    <button onclick="this.closest('#download-fallback-modal').remove()" class="absolute top-4 right-4 text-gray-400 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+                    <div class="text-4xl text-emerald-400 mb-3"><i class="fa-solid fa-file-excel"></i></div>
+                    <h3 class="text-2xl font-bold mb-2 text-white font-heading">Unduh Template Soal</h3>
+                    <p class="text-gray-300 text-sm mb-4">File <code class="text-yellow-300 font-bold">Template_Soal_EduTilt.xlsx</code> sedang diproses oleh browser Anda.</p>
+                    <div class="bg-gray-900/80 p-4 rounded-xl border border-gray-700/80 mb-5 text-left">
+                        <p class="text-xs text-amber-400 font-bold mb-3"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Jika browser/pratinjau memblokir unduhan otomatis:</p>
+                        <div class="flex flex-col gap-2.5">
+                            <a href="${dataUri}" download="Template_Soal_EduTilt.csv" class="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-bold text-center transition-all flex items-center justify-center gap-2 text-white shadow-lg">
+                                <i class="fa-solid fa-download"></i> Unduh Format CSV Alternatif
+                            </a>
+                            <button onclick="copyCsvTemplate()" class="py-2.5 px-4 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 text-white shadow-lg">
+                                <i class="fa-solid fa-copy"></i> Salin Format Teks Template
+                            </button>
+                        </div>
+                    </div>
+                    <button onclick="this.closest('#download-fallback-modal').remove()" class="py-2.5 px-6 bg-gray-700 hover:bg-gray-600 rounded-xl font-bold text-sm w-full">Selesai / Tutup</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function copyCsvTemplate() {
+            const csvContent = "Soal,OpsiKiri,OpsiKanan,Jawaban\nApa nama ibukota negara Indonesia?,Bandung,Jakarta,kanan\nBerapa hasil dari 7 x 8?,56,54,kiri\nHewan mamalia yang bisa terbang?,Kelelawar,Burung Hantu,kiri\nPlanet terdekat dari matahari?,Mars,Merkurius,kanan";
+            const textarea = document.createElement('textarea');
+            textarea.value = csvContent;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            showMessage("Format template berhasil disalin ke clipboard! Buka Excel lalu Paste (Ctrl+V).");
+        }
+
+        function importExcel(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const jsonRaw = XLSX.utils.sheet_to_json(worksheet);
+
+                    let importedCount = 0;
+                    jsonRaw.forEach(row => {
+                        const q = row['Soal'] || row['soal'] || row['SOAL'];
+                        const l = row['OpsiKiri'] || row['opsikiri'] || row['Opsi Kiri'] || row['opsi kiri'];
+                        const r = row['OpsiKanan'] || row['opsikanan'] || row['Opsi Kanan'] || row['opsi kanan'];
+                        let a = row['Jawaban'] || row['jawaban'] || row['JAWABAN'];
+                        
+                        if(q && l && r && a) {
+                            a = a.toString().toLowerCase().trim();
+                            if(a === 'kiri' || a === 'kanan') {
+                                questions.push({ id: Date.now() + Math.random(), q, l, r, a });
+                                importedCount++;
+                            }
+                        }
+                    });
+
+                    if(importedCount > 0) {
+                        saveQuestions();
+                        renderTable();
+                        showMessage(`Sukses! ${importedCount} soal berhasil diimpor.`);
+                    } else {
+                        showMessage("Gagal mengimpor. Pastikan format kolom sesuai dengan Template.");
+                    }
+                } catch(error) {
+                    showMessage("Terjadi kesalahan saat membaca file Excel/CSV.");
+                }
+                event.target.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function showMessage(msg) {
+            const popup = document.createElement('div');
+            popup.className = "fixed top-10 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-4 rounded-xl shadow-2xl border border-gray-600 z-[100] animate-pop text-center max-w-md";
+            popup.innerHTML = `<p class="text-lg mb-4">${msg}</p><button onclick="this.parentElement.remove()" class="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded-lg font-bold w-full">OK</button>`;
+            document.body.appendChild(popup);
+        }
+
+        function loadQuestion(playerRef, pIndex) {
+            const randomQ = questions[Math.floor(Math.random() * questions.length)];
+            playerRef.currentQ = randomQ;
+            playerRef.tiltProgress = 0;
+            playerRef.tiltDirection = null;
+            playerRef.isAnswering = false;
+
+            const prefix = pIndex === 1 ? 'p1' : 'p2';
+            document.getElementById(`${prefix}-question`).innerText = randomQ.q;
+            document.getElementById(`${prefix}-text-left`).innerText = randomQ.l;
+            document.getElementById(`${prefix}-text-right`).innerText = randomQ.r;
+            
+            document.getElementById(`${prefix}-prog-left`).style.width = '0%';
+            document.getElementById(`${prefix}-prog-right`).style.width = '0%';
+            document.getElementById(`${prefix}-opt-left`).classList.remove('active-tilt');
+            document.getElementById(`${prefix}-opt-right`).classList.remove('active-tilt');
+            
+            const contentContainer = document.getElementById(`${prefix}-content`);
+            contentContainer.classList.remove('tilt-left-anim', 'tilt-right-anim');
+            contentContainer.classList.add('tilt-neutral');
+            
+            document.getElementById(`${prefix}-feedback`).classList.add('hidden');
+        }
+
+        function updateScoreUI() {
+            if(gameMode === 1) {
+                document.getElementById('score-display').innerHTML = `Skor: <span class="text-white">${p1.score}</span> / ${targetScore}`;
+            } else {
+                document.getElementById('score-display').innerHTML = `<span class="text-blue-400">P1: ${p1.score}</span> <span class="text-gray-500 mx-2 text-xl font-normal">| Target: ${targetScore} |</span> <span class="text-emerald-400">P2: ${p2.score}</span>`;
+            }
+        }
+
+        async function startGame(mode) {
+            if(questions.length === 0) {
+                showMessage("Bank soal masih kosong! Harap tambahkan soal di menu Kelola Soal.");
+                return;
+            }
+            
+            targetScore = parseInt(document.getElementById('target-score-input').value) || 50;
+            
+            gameMode = mode;
+            gameActive = true;
+            showScreen('game-screen');
+            document.getElementById('camera-wrapper').style.display = 'block';
+            document.getElementById('winner-screen').classList.add('hidden');
+            
+            p1.score = 0; p2.score = 0;
+            p1.isAnswering = false; p2.isAnswering = false;
+            updateScoreUI();
+
+            document.getElementById('p1-area').classList.remove('hidden');
+            if (mode === 2) {
+                document.getElementById('p2-area').classList.remove('hidden');
+                document.getElementById('divider').classList.remove('hidden');
+            } else {
+                document.getElementById('p2-area').classList.add('hidden');
+                document.getElementById('divider').classList.add('hidden');
+            }
+
+            loadQuestion(p1, 1);
+            if(mode === 2) loadQuestion(p2, 2);
+
+            if(!aiLoaded) {
+                document.getElementById('loading-camera').classList.remove('hidden');
+                document.getElementById('ai-status').classList.add('hidden');
+                initAI();
+            } else {
+                document.getElementById('loading-camera').classList.add('hidden');
+                document.getElementById('ai-status').classList.remove('hidden');
+            }
+        }
+
+        function endGame() {
+            gameActive = false;
+            showScreen('menu-screen');
+        }
+
+        const videoElement = document.getElementById('webcam');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        let camera;
+        let faceMesh;
+        let aiLoaded = false;
+
+        async function initAI() {
+            if (aiLoaded) return;
+            
+            faceMesh = new FaceMesh({locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+            }});
+            
+            faceMesh.setOptions({
+                maxNumFaces: 2, 
+                refineLandmarks: false,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+            
+            faceMesh.onResults(onFaceMeshResults);
+
+            camera = new Camera(videoElement, {
+                onFrame: async () => {
+                    if (gameActive) {
+                        await faceMesh.send({image: videoElement});
+                    }
+                },
+                width: 640,
+                height: 480
+            });
+            
+            await camera.start();
+            aiLoaded = true;
+            
+            document.getElementById('loading-camera').classList.add('hidden');
+            document.getElementById('ai-status').classList.remove('hidden');
+        }
+
+        function onFaceMeshResults(results) {
+            if(!gameActive) return;
+            
+            const faces = results.multiFaceLandmarks;
+            if (!faces || faces.length === 0) return;
+
+            if (gameMode === 1) {
+                if (faces[0]) processPlayerLogic(faces[0], p1, 1);
+            } else if (gameMode === 2) {
+                let faceLeftScreen = null;
+                let faceRightScreen = null;
+
+                if(faces.length === 1 && faces[0] && faces[0][1]) {
+                    const cx = faces[0][1].x;
+                    if(cx > 0.5) faceLeftScreen = faces[0];
+                    else faceRightScreen = faces[0];
+                } else if (faces.length >= 2 && faces[0] && faces[1] && faces[0][1] && faces[1][1]) {
+                    const c0 = faces[0][1].x;
+                    const c1 = faces[1][1].x;
+                    if(c0 > c1) {
+                        faceLeftScreen = faces[0];
+                        faceRightScreen = faces[1];
+                    } else {
+                        faceLeftScreen = faces[1];
+                        faceRightScreen = faces[0];
+                    }
+                }
+
+                if(faceLeftScreen) processPlayerLogic(faceLeftScreen, p1, 1);
+                if(faceRightScreen) processPlayerLogic(faceRightScreen, p2, 2);
+            }
+        }
+
+        function processPlayerLogic(landmarks, player, pIndex) {
+            if(!player || player.isAnswering || !landmarks || !landmarks[10] || !landmarks[152]) return;
+
+            const topHead = landmarks[10]; 
+            const bottomChin = landmarks[152];
+            
+            const dx = topHead.x - bottomChin.x;
+            const dy = topHead.y - bottomChin.y;
+            
+            let angle = Math.atan2(dx, -dy) * (180 / Math.PI);
+            
+            let currentTilt = null;
+            
+            if (angle > TILT_THRESHOLD) {
+                currentTilt = 'kiri';
+            } else if (angle < -TILT_THRESHOLD) {
+                currentTilt = 'kanan';
+            }
+
+            const prefix = pIndex === 1 ? 'p1' : 'p2';
+            const optL = document.getElementById(`${prefix}-opt-left`);
+            const optR = document.getElementById(`${prefix}-opt-right`);
+            const progL = document.getElementById(`${prefix}-prog-left`);
+            const progR = document.getElementById(`${prefix}-prog-right`);
+            const contentContainer = document.getElementById(`${prefix}-content`);
+
+            if (currentTilt === player.tiltDirection && currentTilt !== null) {
+                player.tiltProgress += 1;
+            } else {
+                player.tiltProgress = 0;
+                player.tiltDirection = currentTilt;
+            }
+
+            if(player.tiltDirection === 'kiri') {
+                optL.classList.add('active-tilt');
+                optR.classList.remove('active-tilt');
+                progL.style.width = `${Math.min((player.tiltProgress / TILT_TIME_REQUIRED) * 100, 100)}%`;
+                progR.style.width = '0%';
+                
+                contentContainer.classList.add('tilt-left-anim');
+                contentContainer.classList.remove('tilt-right-anim', 'tilt-neutral');
+            } else if (player.tiltDirection === 'kanan') {
+                optR.classList.add('active-tilt');
+                optL.classList.remove('active-tilt');
+                progR.style.width = `${Math.min((player.tiltProgress / TILT_TIME_REQUIRED) * 100, 100)}%`;
+                progL.style.width = '0%';
+                
+                contentContainer.classList.add('tilt-right-anim');
+                contentContainer.classList.remove('tilt-left-anim', 'tilt-neutral');
+            } else {
+                optL.classList.remove('active-tilt');
+                optR.classList.remove('active-tilt');
+                progL.style.width = '0%';
+                progR.style.width = '0%';
+                
+                contentContainer.classList.add('tilt-neutral');
+                contentContainer.classList.remove('tilt-left-anim', 'tilt-right-anim');
+            }
+
+            if (player.tiltProgress >= TILT_TIME_REQUIRED) {
+                handleAnswer(player, pIndex, player.tiltDirection);
+            }
+        }
+
+        function handleAnswer(player, pIndex, answer) {
+            player.isAnswering = true;
+            const prefix = pIndex === 1 ? 'p1' : 'p2';
+            const feedbackBox = document.getElementById(`${prefix}-feedback`);
+            const feedbackText = document.getElementById(`${prefix}-feedback-text`);
+            
+            const isCorrect = (player.currentQ.a === answer);
+            
+            feedbackBox.classList.remove('hidden');
+            if(isCorrect) {
+                player.score += 10;
+                feedbackText.innerText = "BENAR! 🎉";
+                feedbackText.className = "text-5xl md:text-7xl font-heading animate-pop text-green-400 drop-shadow-[0_0_20px_rgba(74,222,128,0.8)]";
+                playSound(true);
+            } else {
+                feedbackText.innerText = "SALAH! ❌";
+                feedbackText.className = "text-5xl md:text-7xl font-heading animate-pop text-red-400 drop-shadow-[0_0_20px_rgba(248,113,113,0.8)]";
+                playSound(false);
+            }
+
+            updateScoreUI();
+
+            if (player.score >= targetScore) {
+                setTimeout(() => triggerWin(pIndex, player.score), 800);
+                return;
+            }
+
+            setTimeout(() => {
+                if(gameActive) {
+                    loadQuestion(player, pIndex);
+                }
+            }, 1200);
+        }
+
+        function triggerWin(pIndex, score) {
+            gameActive = false;
+            document.getElementById('winner-screen').classList.remove('hidden');
+            
+            const winText = document.getElementById('winner-text');
+            const winScore = document.getElementById('winner-score');
+            
+            if (gameMode === 1) {
+                winText.innerHTML = "Kamu Berhasil<br>Menang! 🌟";
+                winScore.innerText = `Skor Akhir Tercapai: ${score}`;
+            } else {
+                const colorClass = pIndex === 1 ? 'text-blue-300' : 'text-emerald-300';
+                winText.innerHTML = `<span class="${colorClass}">Pemain ${pIndex}</span><br>Menang! 🚀`;
+                winScore.innerText = `Skor Pemenang: ${score}`;
+            }
+            playSound(true); 
+            setTimeout(() => playSound(true), 150);
+            setTimeout(() => playSound(true), 300);
+        }
+
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        function playSound(isCorrect) {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            if (isCorrect) {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1046.50, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(250, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.4);
+            }
+        }
+
+        window.onload = () => {
+            initData();
+        };
+    </script>
+</body>
+</html>
